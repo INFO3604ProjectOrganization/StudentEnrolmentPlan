@@ -16,24 +16,22 @@ Y_std = Y.std()
 X_normalized = (X - X_mean) / X_std
 Y_normalized = (Y - Y_mean) / Y_std
 
-X_poly = torch.cat((X_normalized, X_normalized**2), dim=1)
-
-class PolynomialRegressionModel(torch.nn.Module):
+class LinearRegressionModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.linear = torch.nn.Linear(2, 1)
+        self.linear = torch.nn.Linear(1, 1)
 
     def forward(self, x):
         return self.linear(x)
 
-model = PolynomialRegressionModel()
+model = LinearRegressionModel()
 
 criterion = torch.nn.MSELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.02)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
 
-epochs = 1500
+epochs = 3500
 for epoch in range(epochs):
-    y_pred = model(X_poly)
+    y_pred = model(X_normalized)
     loss = criterion(y_pred, Y_normalized)
 
     optimizer.zero_grad()
@@ -41,19 +39,15 @@ for epoch in range(epochs):
     optimizer.step()
 
     if epoch % 100 == 0:
-        print(f'Epoch [{epoch}/{epochs}], Loss: {loss.item():.4f}')
+        print(f'Epoch [{epoch}/{epochs}], Loss: {loss.item():.4f}, Weight: {model.linear.weight.item()}, Bias: {model.linear.bias.item()}')
 
 plt.scatter(X.numpy(), Y.numpy(), color='#D5006D', label='Original Data')
 
 with torch.no_grad():
-    sorted_X, sorted_indices = torch.sort(X_normalized, dim=0)
-    sorted_X_poly = torch.cat((sorted_X, sorted_X**2), dim=1)
-    predicted_normalized = model(sorted_X_poly)
-    
-    predicted = predicted_normalized * Y_std + Y_mean
-    sorted_X_actual = sorted_X * X_std + X_mean
+    predicted = model(X_normalized)
+    predicted_denormalized = predicted * Y_std + Y_mean
 
-    plt.plot(sorted_X_actual.numpy(), predicted.numpy(), color='blue', label='Fitted Curve')
+    plt.plot(class_size, predicted_denormalized.numpy(), color='blue', label='Fitted Line')
 
 plt.xlabel('Class Size')
 plt.ylabel('Average Exam Score')

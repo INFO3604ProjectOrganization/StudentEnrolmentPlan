@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Size Predictor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #e3f2fd, #bbdefb);
+            text-align: center;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 500px;
+            margin: 50px auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1565c0;
+            margin-bottom: 20px;
+        }
+        label {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+        input {
+            padding: 12px;
+            width: 85%;
+            font-size: 16px;
+            border: 2px solid #90caf9;
+            border-radius: 8px;
+            outline: none;
+            text-align: center;
+            margin: 10px 0;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        input:focus {
+            border-color: #1565c0;
+        }
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            border: none;
+            background: #1976d2;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s ease;
+        }
+        button:hover {
+            background: #1565c0;
+            transform: scale(1.05);
+        }
+        img {
+            width: 100%;
+            margin-top: 20px;
+            border-radius: 8px;
+            border: 2px solid #90caf9;
+        }
+        h2 {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: 500;
+            color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Class Size to Exam Score Predictor</h1>
+        <form method="POST">
+            <label for="class_size">Enter Class Size:</label><br>
+            <input type="number" id="class_size" name="class_size" required><br>
+            <button type="submit">Predict</button>
+        </form>
+
+        {% if prediction %}
+            <h2>📈 {{ prediction }}</h2>
+        {% endif %}
+
+        {% if img_path %}
+            <img src="{{ img_path }}" alt="Regression Graph">
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Size Predictor</title>
+    <title>Student Enrollment Analyzer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         * {
@@ -19,7 +19,7 @@
             color: #333;
         }
         .container {
-            max-width: 500px;
+            max-width: 800px;
             margin: 50px auto;
             background: #ffffff;
             padding: 30px;
@@ -64,41 +64,24 @@
             border-radius: 8px;
             cursor: pointer;
             transition: 0.3s ease;
+            margin-top: 20px;
         }
         button:hover {
             background: #1565c0;
             transform: scale(1.05);
         }
-        img {
-            width: 100%;
-            margin-top: 20px;
-            border-radius: 8px;
-            border: 2px solid #90caf9;
-        }
-        h2 {
-            margin-top: 20px;
-            font-size: 20px;
-            font-weight: 500;
-            color: #1565c0;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 Class Size to Exam Score Predictor</h1>
+        <h1>Welcome to Student Enrollment Analyzer</h1>
         <form method="POST">
             <label for="class_size">Enter Class Size:</label><br>
             <input type="number" id="class_size" name="class_size" required><br>
-            <button type="submit">Predict</button>
+
+            <button type="submit" name="action" value="grades">Predict Grades</button> 
+            <button type="submit" name="action" value="cost">Predict Cost</button> 
         </form>
-
-        {% if prediction %}
-            <h2>📈 {{ prediction }}</h2>
-        {% endif %}
-
-        {% if img_path %}
-            <img src="{{ img_path }}" alt="Regression Graph">
-        {% endif %}
     </div>
 </body>
 </html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Experience Ratings</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            text-align: center;
+        }
+        h1 {
+            color: #1976d2;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .ratings {
+            margin-top: 20px;
+        }
+        .rating-item {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        .links {
+            margin-top: 30px;
+        }
+        .links a {
+            color: #1976d2;
+            text-decoration: none;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Student Experience Ratings</h1>
+
+        <!-- Display Predictions -->
+        <div class="ratings">
+            <div class="rating-item">
+                <strong>Predicted Engagement: </strong>{{ engagement_pred }}
+            </div>
+            <div class="rating-item">
+                <strong>Predicted Participation: </strong>{{ participation_pred }}
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="/">Go Back to Home</a><br>
+        </div>
+    </div>
+</body>
+</html>

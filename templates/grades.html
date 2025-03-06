@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predict Grades</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #e3f2fd, #bbdefb);
+            text-align: center;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1565c0;
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: 500;
+            color: #1565c0;
+        }
+        img {
+            width: 80%;
+            margin-top: 20px;
+            border-radius: 8px;
+            border: 2px solid #90caf9;
+        }
+        .button-container {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .button-container a {
+            display: inline-block;
+            padding: 12px 20px;
+            background-color: #1565c0;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            width: 48%;
+            text-align: center;
+        }
+        .button-container a:hover {
+            background-color: #1e88e5;
+        }
+        /* Style the 'Predict Student Experience' button */
+        .blue-button {
+            display: inline-block;
+            padding: 12px 20px;
+            background-color: #1565c0;
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            text-decoration: none;
+            text-align: center;
+            width: 100%;
+            cursor: pointer;
+        }
+        .blue-button:hover {
+            background-color: #1e88e5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Predict Grades</h1>
+        <h2>Class Size: {{ class_size }}</h2>
+        <h2>Predicted Average Exam Score: {{ exam_score_pred }}</h2>
+
+        <img src="{{ url_for('static', filename='plot.png') }}" alt="Regression Graph">
+
+        <div class="links">
+            <a href="/">Go Back to Home</a><br>
+        </div>
+
+        <!-- Pass the class_size parameter to student_experience route -->
+        <form action="{{ url_for('student_experience') }}" method="get">
+            <input type="hidden" name="class_size" value="{{ class_size }}">
+            <button type="submit" class="blue-button">Predict Student Experience</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -3,86 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Enrollment Analyzer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>Enrollment Prediction</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
         }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(to right, #e3f2fd, #bbdefb);
-            text-align: center;
-            padding: 20px;
-            color: #333;
+        table, th, td {
+            border: 1px solid black;
         }
-        .container {
-            max-width: 800px;
-            margin: 50px auto;
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+        th, td {
+            padding: 10px;
             text-align: center;
         }
-        h1 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1565c0;
-            margin-bottom: 20px;
+        input[type="number"] {
+            width: 80px;
         }
-        label {
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-        }
-        input {
-            padding: 12px;
-            width: 85%;
-            font-size: 16px;
-            border: 2px solid #90caf9;
-            border-radius: 8px;
-            outline: none;
-            text-align: center;
-            margin: 10px 0;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        input:focus {
-            border-color: #1565c0;
-        }
-        button {
-            padding: 12px 20px;
-            font-size: 16px;
-            font-weight: 600;
-            border: none;
-            background: #1565c0;
-            color: white;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: 0.3s ease;
+        .output {
             margin-top: 20px;
-            margin-right: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
         }
-        button:hover {
-            background: #8ca8e2;
-            transform: scale(1.05);
+        .output table {
+            width: 100%;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to Student Enrollment Analyzer</h1>
-        <form method="POST">
-            <label for="class_size">Enter Class Size:</label><br>
-            <input type="number" id="class_size" name="class_size" required><br>
 
-            <button type="submit" name="action" value="grades">Predict Grades</button> 
-            <button type="submit" name="action" value="cost">Predict Cost</button> 
-        </form>
-    </div>
+<h2>Student Enrollment Prediction</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>Programme</th>
+            <th>Year 1 Intake (Input)</th>
+            <th>Current Enrollment</th>
+            <th>Total Enrollment</th>
+        </tr>
+    </thead>
+    <tbody id="program-table-body">
+        <tr>
+            <td>CS Major</td>
+            <td><input type="number" id="cs-major-input" value="0"></td>
+            <td id="cs-major-current">0</td>
+            <td id="cs-major-total">0</td>
+        </tr>
+        <tr>
+            <td>CS Special</td>
+            <td><input type="number" id="cs-special-input" value="0"></td>
+            <td id="cs-special-current">0</td>
+            <td id="cs-special-total">0</td>
+        </tr>
+        <tr>
+            <td>IT Major</td>
+            <td><input type="number" id="it-major-input" value="0"></td>
+            <td id="it-major-current">0</td>
+            <td id="it-major-total">0</td>
+        </tr>
+        <tr>
+            <td>IT Special</td>
+            <td><input type="number" id="it-special-input" value="0"></td>
+            <td id="it-special-current">0</td>
+            <td id="it-special-total">0</td>
+        </tr>
+        <tr>
+            <td>CS Mgmt</td>
+            <td><input type="number" id="cs-mgmt-input" value="0"></td>
+            <td id="cs-mgmt-current">0</td>
+            <td id="cs-mgmt-total">0</td>
+        </tr>
+    </tbody>
+</table>
+
+<button onclick="submitEnrollment()">Submit</button>
+
+<div class="output">
+    <h3>Predicted Results</h3>
+    <p><strong>Project Student Body Size:</strong> <span id="total-students"></span></p>
+    <p><strong>Predicted Pass Rate:</strong> <span id="predicted-pass-rate"></span></p>
+    <p><strong>Predicted Fail Rate:</strong> <span id="predicted-fail-rate"></span></p>
+
+    <h4>Grade Distribution</h4>
+    <table id="grade-distribution-table">
+        <thead>
+            <tr>
+                <th>Grade</th>
+                <th>Percentage</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Grade distribution will be filled dynamically -->
+        </tbody>
+    </table>
+
+    <p><strong>Mean Mark:</strong> <span id="mean-mark"></span></p>
+    <p><strong>Median Mark:</strong> <span id="median-mark"></span></p>
+</div>
+
+<script>
+    function submitEnrollment() {
+        // Get inputs for each programme
+        const csMajorInput = document.getElementById("cs-major-input").value;
+        const csSpecialInput = document.getElementById("cs-special-input").value;
+        const itMajorInput = document.getElementById("it-major-input").value;
+        const itSpecialInput = document.getElementById("it-special-input").value;
+        const csMgmtInput = document.getElementById("cs-mgmt-input").value;
+
+        // Create request body
+        const requestBody = {
+            cs_major_new: parseInt(csMajorInput),
+            cs_special_new: parseInt(csSpecialInput),
+            it_major_new: parseInt(itMajorInput),
+            it_special_new: parseInt(itSpecialInput),
+            cs_mgmt_new: parseInt(csMgmtInput)
+        };
+
+        // Send request to FastAPI endpoint
+        fetch('/predict', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Update table with totals
+            updateTable(data);
+
+            // Update output with predicted results
+            document.getElementById("total-students").textContent = data.total_students;
+            document.getElementById("predicted-pass-rate").textContent = data.predicted_pass_rate.toFixed(2) + "%";
+            document.getElementById("predicted-fail-rate").textContent = data.predicted_fail_rate.toFixed(2) + "%";
+
+            // Update grade distribution table
+            updateGradeDistribution(data.grade_distribution);
+
+            // Update mean and median marks
+            document.getElementById("mean-mark").textContent = data.mean_mark.toFixed(2);
+            document.getElementById("median-mark").textContent = data.median_mark.toFixed(2);
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function updateTable(data) {
+        document.getElementById("cs-major-current").textContent = data.category_totals.CS_Major_Total;
+        document.getElementById("cs-special-current").textContent = data.category_totals.CS_Special_Total;
+        document.getElementById("it-major-current").textContent = data.category_totals.IT_Major_Total;
+        document.getElementById("it-special-current").textContent = data.category_totals.IT_Special_Total;
+        document.getElementById("cs-mgmt-current").textContent = data.category_totals.CS_Mgmt_Total;
+
+        document.getElementById("cs-major-total").textContent = data.category_totals.CS_Major_Total;
+        document.getElementById("cs-special-total").textContent = data.category_totals.CS_Special_Total;
+        document.getElementById("it-major-total").textContent = data.category_totals.IT_Major_Total;
+        document.getElementById("it-special-total").textContent = data.category_totals.IT_Special_Total;
+        document.getElementById("cs-mgmt-total").textContent = data.category_totals.CS_Mgmt_Total;
+    }
+
+    function updateGradeDistribution(gradeDistribution) {
+        const gradeTableBody = document.getElementById("grade-distribution-table").getElementsByTagName("tbody")[0];
+        gradeTableBody.innerHTML = '';  // Clear previous entries
+
+        for (const grade in gradeDistribution) {
+            const row = gradeTableBody.insertRow();
+            const gradeCell = row.insertCell(0);
+            const percentageCell = row.insertCell(1);
+
+            gradeCell.textContent = grade;
+            percentageCell.textContent = gradeDistribution[grade];
+        }
+    }
+</script>
+
 </body>
 </html>

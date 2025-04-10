@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            background-color: lightblue;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .card {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
+        p {
+            font-size: 18px;
+        }
+
+        img {
+            max-width: 100%;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 15px;
+        }
+
+        a {
+            display: inline-block;
+            margin: 15px 10px 0;
+            padding: 10px 20px;
+            background-color: #3399ff;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        a:hover {
+            background-color: #005f99;
+        }
+    </style>
+    <title>Satisfaction Prediction</title>
+</head>
+<body>
+    <div class="card">
+        <h1>Satisfaction Classifier Results</h1>
+        <p>Accuracy of the model: <strong>{{ accuracy }}</strong></p>
+
+        <img src="/static/graphs/satisfaction_importance.png" alt="Feature Importance">
+
+        <a href="{{ url_for('wordcloud') }}">View Word Cloud</a>
+        <a href="{{ url_for('index') }}">Back to Home</a>
+    </div>
+</body>
+</html>

@@ -7,6 +7,8 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from data_prep import apply_pca, find_best_k, visualize_clusters
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, classification_report, accuracy_score
+from sklearn.ensemble import RandomForestClassifier
+import seaborn as sns
 
 from flask import request, redirect, url_for, render_template
 from fastapi import FastAPI, Request, Form
@@ -14,6 +16,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+from wordcloud import WordCloud
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import string
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -62,7 +70,7 @@ def calculate_graduates_for_semester1(grades_df, courses_df):
 
         filtered_grades = grades_df[grades_df['CourseID'].isin(course_ids)]
 
-        num_graduates = (filtered_grades['No. Pass Exam'] + filtered_grades['No. Fail Exam']).sum()
+        num_graduates = (filtered_grades['No. Pass Exam'] + filtered_grades['No. Failed Exams']).sum()
 
         graduates_by_program[program_col] = num_graduates
 
@@ -307,3 +315,113 @@ async def project_enrollment(request: Request):
                                         "total_new_enrollment": total_new_enrollment,
                                         "estimated_cost": total_new_enrollment * overall_avg
                                         })
+
+@app.post("/calculate_custom_cost")
+async def calculate_custom_cost(request: Request):
+    form_data = await request.form()
+    cost_per_assessment = float(form_data.get("cost_per_assessment", 0))
+    total_intake_sum = int(form_data.get("total_intake_sum", 0))
+    
+    custom_cost = cost_per_assessment * total_intake_sum
+
+    return templates.TemplateResponse("prediction.html", {
+        "request": request,
+        "custom_cost": custom_cost,
+        "total_intake_sum": total_intake_sum
+    })
+
+
+@app.get("/wordcloud", name="wordcloud")
+def wordcloud_endpoint(request: Request):
+    file_path_s = "Survey_Response/Student Survey Responses.csv"
+    
+    survey_df = load_survey_data(file_path_s)
+    text_column = "Any Additional Comments on your Experience with Large Class Sizes?"
+    processed_text = preprocess_text(survey_df[text_column])
+    
+    wordcloud = generate_wordcloud(processed_text)
+    
+    wordcloud_path = "static/graphs/wordcloud.png"
+    wordcloud.to_file(wordcloud_path)
+    
+    return templates.TemplateResponse("wordcloud.html", {"request": request})
+
+nltk.download('punkt_tab')
+nltk.download('stopwords')
+
+def load_survey_data(file_path_s):
+    survey_df = pd.read_csv(file_path_s)
+    return survey_df
+
+def preprocess_text(data_column):
+    stop_words = set(stopwords.words('english'))
+
+    text_data = " ".join(data_column.dropna())
+
+    tokens = word_tokenize(text_data)
+    
+    filtered_tokens = [
+        word.lower() for word in tokens if word.isalpha() and word.lower() not in stop_words
+    ]
+    
+    return ' '.join(filtered_tokens)
+
+def generate_wordcloud(text):
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+    return wordcloud
+
+def display_wordcloud(wordcloud):
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.show()
+
+@app.get("/predict_satisfaction", response_class=HTMLResponse)
+def predict_satisfaction(request: Request):
+    df = pd.read_csv('Survey_Response/Student Survey Responses.csv')
+
+    question_cols = [
+        "There is Sufficient Lab Space",
+        "There are Opportunities to Participate in Large Classes",
+        "There is Difficulty Finding Lab Seats",
+        "I can Keep Up in Large Classes",
+        "Large Classes are Less Engaging",
+        "Large Classes has Better Teaching Quality"
+    ]
+
+    df['avg_score'] = df[question_cols].mean(axis=1)
+    df['satisfaction_label'] = pd.cut(
+        df['avg_score'],
+        bins=[0, 2, 3.5, 5],
+        labels=['Low', 'Medium', 'High']
+    )
+
+    X = df[question_cols]
+    y = df['satisfaction_label']
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    model = RandomForestClassifier()
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+
+    importance = pd.Series(model.feature_importances_, index=question_cols).sort_values()
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=importance, y=importance.index)
+    plt.xlabel('Strongly Disagree <-----------------------------> Strongly Agree')
+    plt.ylabel('Student Responses')
+    plt.title("Feature Importance for Satisfaction Prediction")
+    plt.tight_layout()
+    plt.savefig('static/graphs/satisfaction_importance.png')
+    plt.close()
+
+    return templates.TemplateResponse(
+        "student_satisfaction.html",
+        {"request": request, "accuracy": round(accuracy, 2)}
+    )
+ 
+ if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

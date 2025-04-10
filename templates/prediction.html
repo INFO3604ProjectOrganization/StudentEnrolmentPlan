@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            background-color: lightblue;
+            font-family: Arial, sans-serif;
+        }
+
+        .card {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        }
+
+        h1, h3, h4 {
+            text-align: center;
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #999;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+        }
+
+        form {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        input[type="number"] {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            width: 200px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #3399ff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #005f99;
+        }
+
+        a {
+            display: inline-block;
+            margin: 15px 10px 0;
+            padding: 10px 20px;
+            background-color: #3399ff;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        a:hover {
+            background-color: #005f99;
+        }
+    </style>
+    <title>Predict Student enrolment and Estimated Cost</title>
+</head>
+<body>
+    <div class="card">
+        <h1>Projected Enrollment and Costs</h1>
+        <table border="1">
+        <tr>
+            <th>Program</th>
+            <th>Year 1 Intake</th>
+            <th>Current Enrollment</th>
+            <th>Total Enrollment</th>
+        </tr>
+        {% for prog in new_intakes %}
+            <tr>
+            <td>{{ prog }}</td>
+            <td>{{ new_intakes[prog] }}</td>
+            <td>{{ current_enrollment[prog] }}</td>
+            <td>{{ new_intakes[prog] + current_enrollment[prog] }}</td>
+            </tr>
+        {% endfor %}
+        </table>
+
+        <h3>Total Year 1 Enrolment Size: {{ total_intake_sum }}</h3>
+
+        {% if estimated_cost is defined %}
+            <h3>Predicted Marking Cost: ${{ "%.2f"|format(estimated_cost) }}</h3>
+        {% endif %}
+
+
+        <h1> Estimated Marking Cost </h3>
+        <form method="POST" action="/calculate_custom_cost">
+            <label for="cost_per_assessment">Enter Estimated Cost Per Assessment ($):</label>
+            <input type="number" name="cost_per_assessment" id="cost_per_assessment" step="0.01" required>
+            <input type="hidden" name="total_intake_sum" value="{{ total_intake_sum }}">
+            <button type="submit">Calculate Cost</button>
+        </form>
+
+        {% if custom_cost is defined %}
+            <h1>Estimated Marking Cost: ${{ custom_cost }}</h1>
+        {% endif %}
+
+
+        <br><br>
+        <div style="text-align: center;">
+            <a href="{{ url_for('predict_marks') }}">Predict Grades</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,181 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enrollment Prediction</title>
     <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
+        body {
+            background-color: lightblue;
+            font-family: Arial, sans-serif;
         }
-        table, th, td {
-            border: 1px solid black;
+
+        .card {
+            max-width: 650px;
+            margin: 100px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        th, td {
-            padding: 10px;
+
+        h1 {
             text-align: center;
+            color: #333;
         }
-        input[type="number"] {
-            width: 80px;
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
-        .output {
-            margin-top: 20px;
-            padding: 10px;
+
+        .form-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        label {
+            width: 120px;
+            text-align: right;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 200px;
+            padding: 8px;
             border: 1px solid #ccc;
+            border-radius: 6px;
         }
-        .output table {
-            width: 100%;
+
+        button {
+            align-self: center;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #3399ff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #005f99;
         }
     </style>
+    <title>Student Enrolment Plan</title>
 </head>
 <body>
-
-<h2>Student Enrollment Prediction</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Programme</th>
-            <th>Year 1 Intake (Input)</th>
-            <th>Current Enrollment</th>
-            <th>Total Enrollment</th>
-        </tr>
-    </thead>
-    <tbody id="program-table-body">
-        <tr>
-            <td>CS Major</td>
-            <td><input type="number" id="cs-major-input" value="0"></td>
-            <td id="cs-major-current">0</td>
-            <td id="cs-major-total">0</td>
-        </tr>
-        <tr>
-            <td>CS Special</td>
-            <td><input type="number" id="cs-special-input" value="0"></td>
-            <td id="cs-special-current">0</td>
-            <td id="cs-special-total">0</td>
-        </tr>
-        <tr>
-            <td>IT Major</td>
-            <td><input type="number" id="it-major-input" value="0"></td>
-            <td id="it-major-current">0</td>
-            <td id="it-major-total">0</td>
-        </tr>
-        <tr>
-            <td>IT Special</td>
-            <td><input type="number" id="it-special-input" value="0"></td>
-            <td id="it-special-current">0</td>
-            <td id="it-special-total">0</td>
-        </tr>
-        <tr>
-            <td>CS Mgmt</td>
-            <td><input type="number" id="cs-mgmt-input" value="0"></td>
-            <td id="cs-mgmt-current">0</td>
-            <td id="cs-mgmt-total">0</td>
-        </tr>
-    </tbody>
-</table>
-
-<button onclick="submitEnrollment()">Submit</button>
-
-<div class="output">
-    <h3>Predicted Results</h3>
-    <p><strong>Project Student Body Size:</strong> <span id="total-students"></span></p>
-    <p><strong>Predicted Pass Rate:</strong> <span id="predicted-pass-rate"></span></p>
-    <p><strong>Predicted Fail Rate:</strong> <span id="predicted-fail-rate"></span></p>
-
-    <h4>Grade Distribution</h4>
-    <table id="grade-distribution-table">
-        <thead>
-            <tr>
-                <th>Grade</th>
-                <th>Percentage</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Grade distribution will be filled dynamically -->
-        </tbody>
-    </table>
-
-    <p><strong>Mean Mark:</strong> <span id="mean-mark"></span></p>
-    <p><strong>Median Mark:</strong> <span id="median-mark"></span></p>
-</div>
-
-<script>
-    function submitEnrollment() {
-        // Get inputs for each programme
-        const csMajorInput = document.getElementById("cs-major-input").value;
-        const csSpecialInput = document.getElementById("cs-special-input").value;
-        const itMajorInput = document.getElementById("it-major-input").value;
-        const itSpecialInput = document.getElementById("it-special-input").value;
-        const csMgmtInput = document.getElementById("cs-mgmt-input").value;
-
-        // Create request body
-        const requestBody = {
-            cs_major_new: parseInt(csMajorInput),
-            cs_special_new: parseInt(csSpecialInput),
-            it_major_new: parseInt(itMajorInput),
-            it_special_new: parseInt(itSpecialInput),
-            cs_mgmt_new: parseInt(csMgmtInput)
-        };
-
-        // Send request to FastAPI endpoint
-        fetch('/predict', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestBody)
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Update table with totals
-            updateTable(data);
-
-            // Update output with predicted results
-            document.getElementById("total-students").textContent = data.total_students;
-            document.getElementById("predicted-pass-rate").textContent = data.predicted_pass_rate.toFixed(2) + "%";
-            document.getElementById("predicted-fail-rate").textContent = data.predicted_fail_rate.toFixed(2) + "%";
-
-            // Update grade distribution table
-            updateGradeDistribution(data.grade_distribution);
-
-            // Update mean and median marks
-            document.getElementById("mean-mark").textContent = data.mean_mark.toFixed(2);
-            document.getElementById("median-mark").textContent = data.median_mark.toFixed(2);
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
-    function updateTable(data) {
-        document.getElementById("cs-major-current").textContent = data.category_totals.CS_Major_Total;
-        document.getElementById("cs-special-current").textContent = data.category_totals.CS_Special_Total;
-        document.getElementById("it-major-current").textContent = data.category_totals.IT_Major_Total;
-        document.getElementById("it-special-current").textContent = data.category_totals.IT_Special_Total;
-        document.getElementById("cs-mgmt-current").textContent = data.category_totals.CS_Mgmt_Total;
-
-        document.getElementById("cs-major-total").textContent = data.category_totals.CS_Major_Total;
-        document.getElementById("cs-special-total").textContent = data.category_totals.CS_Special_Total;
-        document.getElementById("it-major-total").textContent = data.category_totals.IT_Major_Total;
-        document.getElementById("it-special-total").textContent = data.category_totals.IT_Special_Total;
-        document.getElementById("cs-mgmt-total").textContent = data.category_totals.CS_Mgmt_Total;
-    }
-
-    function updateGradeDistribution(gradeDistribution) {
-        const gradeTableBody = document.getElementById("grade-distribution-table").getElementsByTagName("tbody")[0];
-        gradeTableBody.innerHTML = '';  // Clear previous entries
-
-        for (const grade in gradeDistribution) {
-            const row = gradeTableBody.insertRow();
-            const gradeCell = row.insertCell(0);
-            const percentageCell = row.insertCell(1);
-
-            gradeCell.textContent = grade;
-            percentageCell.textContent = gradeDistribution[grade];
-        }
-    }
-</script>
-
+    <div class="card">
+        <h1>Enter the Year 1 intake for each Program</h1>
+        <form action="/project_enrollment_and_cost" method="post">
+            {% for i in range(1, 8) %}
+                <div class="form-group">
+                    <label for="program{{ i }}">Program {{ i }}:</label>
+                    <input type="number" name="program{{ i }}" id="program{{ i }}" required>
+                </div>
+            {% endfor %}
+            <button type="submit">Submit</button>
+        </form>
+    </div>
 </body>
 </html>

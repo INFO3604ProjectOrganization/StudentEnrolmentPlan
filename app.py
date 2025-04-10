@@ -1,98 +1,309 @@
-from fastapi import FastAPI
+from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from data_prep import apply_pca, find_best_k, visualize_clusters
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, classification_report, accuracy_score
+
+from flask import request, redirect, url_for, render_template
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Initialize FastAPI app
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Load dataset from the Enrollment_Data spreadsheet
-def load_data():
-    file_path = "Enrollment_Data.xlsx"  # Update with actual file path
+@app.get("/", response_class=HTMLResponse, name="index")
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-    # Load the specific worksheets
-    df_grades = pd.read_excel(file_path, sheet_name="grades")  # Grades data (marks, pass/fail rates)
-    df_enrollment = pd.read_excel(file_path, sheet_name="Course Meta")  # Current enrollment data
+def load_data_kmeans(file_path, sheet_name):
+    xls = pd.ExcelFile(file_path)
+    df = pd.read_excel(xls, sheet_name=sheet_name)
+    numeric_cols = ["No. Sat Exam", "No. Pass Exam", "No. Failed Exams", "Mean Mark", "Median Mark"]
+    df = df[numeric_cols].dropna()
+    scaler = StandardScaler()
+    df_scaled = scaler.fit_transform(df)
+    return df, df_scaled, scaler
 
-    # Assuming the `Course Meta` contains columns: 'Programme' and 'Current Enrollment'
-    # The 'Programme' column contains program names like 'CS Major', 'CS Special', etc.
-    enrollment_data = {
-        "CS_Major_Current": df_enrollment.loc[df_enrollment['Programme'] == 'CS Major', 'Current Enrollment'].values[0],
-        "CS_Special_Current": df_enrollment.loc[df_enrollment['Programme'] == 'CS Special', 'Current Enrollment'].values[0],
-        "IT_Major_Current": df_enrollment.loc[df_enrollment['Programme'] == 'IT Major', 'Current Enrollment'].values[0],
-        "IT_Special_Current": df_enrollment.loc[df_enrollment['Programme'] == 'IT Special', 'Current Enrollment'].values[0],
-        "CS_Mgmt_Current": df_enrollment.loc[df_enrollment['Programme'] == 'CS Mgmt', 'Current Enrollment'].values[0]
-    }
+def load_and_preprocess_data(file_path, sheet_name):
+    xls = pd.ExcelFile(file_path)
+    df = pd.read_excel(xls, sheet_name=sheet_name)
 
-    # Adding the current enrollment data to the grades DataFrame
-    for program, current_enroll in enrollment_data.items():
-        df_grades[program] = current_enroll
+    df = df[["No. Sat Exam", "Mean Mark", "Median Mark", "No. Pass Exam", "No. Failed Exams"]].dropna()
 
-    return df_grades, df_enrollment
+    X = df[["No. Sat Exam"]].values
+    y_mean = df["Mean Mark"].values
+    y_median = df["Median Mark"].values
+    y_pass = df["No. Pass Exam"].values
+    y_fail = df["No. Failed Exams"].values
 
-df_grades, df_enrollment = load_data()
+    return X, y_mean, y_median, y_pass, y_fail
 
-# Train K-Means Model based on relevant exam data (e.g., No. Sat Exam, No. Pass Exam)
-kmeans = KMeans(n_clusters=5, random_state=42)
-kmeans.fit(df_grades[['No. Sat Exam', 'No. Pass Exam']])
+def calculate_graduates_for_semester1(grades_df, courses_df):
+    graduates_by_program = {}
 
-# Train Random Forest Model for Grade Prediction based on grade distributions
-features = ['No. Sat Exam']  # Predicting based on the number of students who sat the exam
-targets = ['90 - 100 A+', '80 - 89 A', '75 - 79 A-', '70 - 74 B+', '65 - 69 B', '60 - 64 B-', '55 - 59 C+', '50 - 54 C', '40- 49 F1', '30 - 39 F2', '0 - 29 F3']
-random_forest = RandomForestRegressor(n_estimators=100, random_state=42)
-random_forest.fit(df_grades[features], df_grades[targets])
+    for program_num in range(1, 8): 
+        program_col = f"Programme {program_num}"
 
-# Request model for student enrollment input
-class EnrollmentInput(BaseModel):
-    cs_major_new: int
-    cs_special_new: int
-    it_major_new: int
-    it_special_new: int
-    cs_mgmt_new: int
+        relevant_courses = courses_df[
+            (courses_df['Semester'] == 'I') &
+            (courses_df['Level'] == 3) &
+            (courses_df[program_col].isin(["CORE", "ELECTIVE"]))
+        ]
 
-@app.post("/predict")
-def predict(input_data: EnrollmentInput):
-    # Compute total projected enrollments
-    total_cs_major = input_data.cs_major_new + df_grades['CS_Major_Current'].mean()
-    total_cs_special = input_data.cs_special_new + df_grades['CS_Special_Current'].mean()
-    total_it_major = input_data.it_major_new + df_grades['IT_Major_Current'].mean()
-    total_it_special = input_data.it_special_new + df_grades['IT_Special_Current'].mean()
-    total_cs_mgmt = input_data.cs_mgmt_new + df_grades['CS_Mgmt_Current'].mean()
+        course_ids = relevant_courses['CourseID'].tolist()
 
-    total_students = total_cs_major + total_cs_special + total_it_major + total_it_special + total_cs_mgmt
+        filtered_grades = grades_df[grades_df['CourseID'].isin(course_ids)]
 
-    # Predict pass/fail percentage based on clustering
-    cluster_label = kmeans.predict([[total_students, 0]])[0]
-    predicted_pass_rate = df_grades[df_grades['No. Sat Exam'] == kmeans.cluster_centers_[cluster_label][0]]['% Passed Exam'].mean()
-    predicted_fail_rate = 100 - predicted_pass_rate
+        num_graduates = (filtered_grades['No. Pass Exam'] + filtered_grades['No. Fail Exam']).sum()
 
-    # Predict grade distribution
-    grade_distribution = random_forest.predict([[total_students]])[0]
+        graduates_by_program[program_col] = num_graduates
 
-    return {
-        "total_students": total_students,
-        "category_totals": {
-            "CS_Major_Total": total_cs_major,
-            "CS_Special_Total": total_cs_special,
-            "IT_Major_Total": total_it_major,
-            "IT_Special_Total": total_it_special,
-            "CS_Mgmt_Total": total_cs_mgmt
-        },
+    return graduates_by_program
+
+def calculate_total_new_enrollment(enrollment_data, program_avg, new_intakes):
+    current_enrollment = {}
+    total_new_enrollment = 0
+
+    latest_year = sorted(enrollment_data.keys())[-1]
+    latest_sem_data = enrollment_data[latest_year]["semester_enrollment"]
+
+    for prog_num in range(1, 8):
+        prog_name = f"Programme {prog_num}"
+        sem1 = latest_sem_data["Semester I"].get(prog_name, 0)
+        sem2 = latest_sem_data["Semester II"].get(prog_name, None)
+
+        if sem2 is not None and sem2 != 0:
+            current = (sem1 + sem2) / 2
+        else:
+            current = sem1
+
+        current_enrollment[prog_name] = current
+
+    for prog_name in current_enrollment:
+        curr = current_enrollment[prog_name]
+        intake = new_intakes.get(prog_name, 0)
+        grads = program_avg.get(prog_name, 0)
+        new_enrol = curr + intake - grads
+        total_new_enrollment += new_enrol
+
+    return total_new_enrollment
+
+@app.get("/predict_marks", response_class=HTMLResponse)
+def get_prediction_form(request: Request):
+    return templates.TemplateResponse("predict_grades.html", {"request": request})
+
+@app.post("/predict_marks")
+def predict_marks(request: Request, class_size: int = Form(...)):
+    file_path = "Enrolment_Data/Enrolment Study Data.xlsx"
+    sheet_name = "Grades Anonymized"
+    X, y_mean, y_median, y_pass, y_fail = load_and_preprocess_data(file_path, sheet_name)
+    
+    model_mean, model_median, model_pass, model_fail = train_models(X, y_mean, y_median, y_pass, y_fail)
+
+    predicted_mean, predicted_median, predicted_pass_rate, predicted_fail_rate = predict_marks_logic(
+        class_size, model_mean, model_median, model_pass, model_fail
+    )
+    
+    df_kmeans, df_scaled, scaler = load_data_kmeans(file_path, sheet_name)
+    pca_result = apply_pca(df_scaled)
+    optimal_k_elbow, optimal_k_silhouette = find_best_k(pca_result)
+    best_k = optimal_k_elbow
+    kmeans = KMeans(n_clusters=best_k, random_state=42)
+    df_kmeans["Cluster"] = kmeans.fit_predict(pca_result)
+    visualize_clusters(pca_result, df_kmeans["Cluster"].values, kmeans.cluster_centers_, best_k)
+
+    return templates.TemplateResponse("predict_grades.html", {
+        "request": request,
+        "class_size": class_size,
+        "predicted_mean": predicted_mean,
+        "predicted_median": predicted_median,
         "predicted_pass_rate": predicted_pass_rate,
         "predicted_fail_rate": predicted_fail_rate,
-        "grade_distribution": {target: round(grade_distribution[i]) for i, target in enumerate(targets)},
-        "mean_mark": df_grades['Mean Mark'].mean(),
-        "median_mark": df_grades['Median Mark'].median()
-    }
+        "cluster_plot": "graphs/kmean_clusters.png"
+    })
 
-@app.get("/reload-data")
-def reload_data():
-    global df_grades, df_enrollment, kmeans, random_forest
-    df_grades, df_enrollment = load_data()
+def train_models(X, y_mean, y_median, y_pass, y_fail):
+    model_mean = LinearRegression().fit(X, y_mean)
+    model_median = LinearRegression().fit(X, y_median)
+    model_pass = LinearRegression().fit(X, y_pass)
+    model_fail = LinearRegression().fit(X, y_fail)
+    return model_mean, model_median, model_pass, model_fail
 
-    kmeans.fit(df_grades[['No. Sat Exam', 'No. Pass Exam']])
-    random_forest.fit(df_grades[features], df_grades[targets])
+def predict_marks_logic(class_size, model_mean, model_median, model_pass, model_fail):
+    class_size_array = np.array([[class_size]])
+    predicted_mean = model_mean.predict(class_size_array)[0]
+    predicted_median = model_median.predict(class_size_array)[0]
+    predicted_pass_rate = model_pass.predict(class_size_array)[0]
+    predicted_fail_rate = model_fail.predict(class_size_array)[0]
+    return predicted_mean, predicted_median, predicted_pass_rate, predicted_fail_rate
 
-    return {"message": "Dataset reloaded and models retrained."}
+@app.post("/project_enrollment_and_cost")
+async def project_enrollment(request: Request):
+    file_path = "Enrolment_Data/Enrolment Study Data.xlsx"
+    courses_df = pd.read_excel(file_path, sheet_name="Courses Anonymized")
+    grades_df = pd.read_excel(file_path, sheet_name="Grades Anonymized")
+    expenses_df = pd.read_excel(file_path, sheet_name="Expenses")
+
+    grades_df = grades_df.drop_duplicates()
+    enrollment_data = {}
+
+    years = grades_df['YEAR'].unique()
+
+    for year in years:
+        if "SEM" in year:
+            year = year.split()[0]
+        
+        year_data = grades_df[grades_df['YEAR'] == year]
+        
+        program_enrollment = {}
+        program_courses = {}
+        semester_enrollment = {'Semester I': {}, 'Semester II': {}}
+        semester_i_level_1_enrollment = {'Semester I': {}}
+
+        for program_num in range(1, 8):
+            program_col = f"Programme {program_num}"
+
+            semester_i_courses = courses_df[(courses_df['Semester'] == 'I') & 
+                                             (courses_df[program_col].isin(["CORE", "ELECTIVE"]))]
+            semester_ii_courses = courses_df[(courses_df['Semester'] == 'II') & 
+                                              (courses_df[program_col].isin(["CORE", "ELECTIVE"]))]
+
+            course_ids_semester_i = semester_i_courses["CourseID"].tolist()
+            course_ids_semester_ii = semester_ii_courses["CourseID"].tolist()
+
+            filtered_grades_semester_i = year_data[year_data["CourseID"].isin(course_ids_semester_i)]
+            filtered_grades_semester_ii = year_data[year_data["CourseID"].isin(course_ids_semester_ii)]
+
+            total_enrollment_semester_i = filtered_grades_semester_i["No. Pass Exam"].sum() + filtered_grades_semester_i["No. Failed Exams"].sum()
+            total_enrollment_semester_ii = filtered_grades_semester_ii["No. Pass Exam"].sum() + filtered_grades_semester_ii["No. Failed Exams"].sum()
+
+            semester_enrollment['Semester I'][f"Programme {program_num}"] = total_enrollment_semester_i
+            semester_enrollment['Semester II'][f"Programme {program_num}"] = total_enrollment_semester_ii
+
+            program_courses[f"Programme {program_num}"] = {
+                'Semester I': ", ".join(course_ids_semester_i),
+                'Semester II': ", ".join(course_ids_semester_ii)
+            }
+
+            level_1_courses_semester_i = semester_i_courses[semester_i_courses['Level'] == 1]
+            level_1_course_ids = level_1_courses_semester_i["CourseID"].tolist()
+            filtered_grades_level_1_semester_i = year_data[year_data["CourseID"].isin(level_1_course_ids)]
+            total_level_1_enrollment_semester_i = filtered_grades_level_1_semester_i["No. Pass Exam"].sum() + filtered_grades_level_1_semester_i["No. Failed Exams"].sum()
+
+            semester_i_level_1_enrollment['Semester I'][f"Programme {program_num}"] = total_level_1_enrollment_semester_i
+
+        enrollment_data[year] = {
+            "semester_enrollment": semester_enrollment,
+            "courses": program_courses,
+            "level_1_semester_i_enrollment": semester_i_level_1_enrollment
+        }
+
+    program_totals = {f"Programme {i}": [] for i in range(1, 8)}
+    years_counted = 0
+
+    for year in enrollment_data:
+        grads = calculate_graduates_for_semester1(
+            grades_df[grades_df['YEAR'] == year],
+            courses_df
+        )
+        for prog in grads:
+            program_totals[prog].append(grads[prog])
+        years_counted += 1
+
+    program_avg = {}
+    for prog, yearly_counts in program_totals.items():
+        avg = sum(yearly_counts) / len(yearly_counts) if yearly_counts else 0
+        program_avg[prog] = avg
+
+    final_overall_avg = sum(program_avg.values()) / years_counted if years_counted else 0
+
+    latest_year = sorted(enrollment_data.keys())[-1]
+    latest_sem_data = enrollment_data[latest_year]["semester_enrollment"]
+
+    current_enrollment = {}
+    for prog_num in range(1, 8):
+        prog_name = f"Programme {prog_num}"
+        sem1 = latest_sem_data["Semester I"].get(prog_name, 0)
+        sem2 = latest_sem_data["Semester II"].get(prog_name, None)
+
+        if sem2 is not None and sem2 != 0:
+            current = (sem1 + sem2) / 2
+        else:
+            current = sem1
+
+        current_enrollment[prog_name] = current
+
+    form_data = await request.form()
+    new_intakes = {}
+    total_intake_sum = 0
+
+    for prog_num in range(1, 8):
+        prog_name = f"Programme {prog_num}"
+        intake_str = form_data.get(f"program{prog_num}", 0)
+        intake = int(intake_str)
+        new_intakes[prog_name] = intake
+        total_intake_sum += intake
+
+    total_new_enrollment = calculate_total_new_enrollment(enrollment_data, program_avg, new_intakes)
+
+    expenses_df = expenses_df.dropna(subset=["Total Marking Cost"])
+
+    grades_df["Total Enrolled"] = grades_df["No. Pass Exam"] + grades_df["No. Failed Exams"]
+
+    enrolment_summary = grades_df.groupby(["YEAR", "Semester"])["Total Enrolled"].sum().reset_index()
+
+    merged_df = enrolment_summary.merge(
+        expenses_df, left_on=["YEAR", "Semester"], right_on=["Academic Year", "Semester"], how="inner"
+    )
+
+    merged_df["Cost Per Student"] = merged_df["Total Marking Cost"] / merged_df["Total Enrolled"]
+
+    avg_cost_per_semester = merged_df.groupby("Semester")["Cost Per Student"].mean()
+
+    semester_costs = []
+    for semester, avg_cost in avg_cost_per_semester.items():
+        print(f"Semester {semester}: {avg_cost:.2f}")
+        semester_costs.append(avg_cost)
+
+    if semester_costs:
+        overall_avg = sum(semester_costs) / len(semester_costs)
+
+    X_cost = merged_df["Total Enrolled"].values.reshape(-1, 1)
+    y_cost = merged_df["Total Marking Cost"].values 
+
+    poly = PolynomialFeatures(degree=2)
+    X_poly = poly.fit_transform(X_cost)
+
+    model_cost = LinearRegression()
+    model_cost.fit(X_poly, y_cost)
+
+    X_range = np.linspace(min(X_cost), max(X_cost), 100).reshape(-1, 1)
+    X_range_poly = poly.transform(X_range)
+    y_pred_cost = model_cost.predict(X_range_poly)
+
+    plt.scatter(X_cost, y_cost, color='red', label='Original Data')
+    plt.plot(X_range, y_pred_cost, color='blue', label='Polynomial Fit')
+    plt.xlabel("Total Enrolment per Semester")
+    plt.ylabel("Total Marking Cost")
+    plt.title("Polynomial Regression: Enrolment vs Marking Cost")
+    plt.legend()
+    plt.close()
+
+    total_new_enrollment = calculate_total_new_enrollment(enrollment_data, program_avg, new_intakes)
+
+    return templates.TemplateResponse("prediction.html", {
+                                        "request": request, 
+                                        "new_intakes": new_intakes,
+                                        "total_intake_sum": total_intake_sum,
+                                        "current_enrollment": current_enrollment,
+                                        "total_new_enrollment": total_new_enrollment,
+                                        "estimated_cost": total_new_enrollment * overall_avg
+                                        })

@@ -333,7 +333,7 @@ async def calculate_custom_cost(request: Request):
 
 @app.get("/wordcloud", name="wordcloud")
 def wordcloud_endpoint(request: Request):
-    file_path_s = "Survey_Response/Student Survey Responses.csv"
+    file_path_s = "Student_Response/Student Survey Responses.csv"
     
     survey_df = load_survey_data(file_path_s)
     text_column = "Any Additional Comments on your Experience with Large Class Sizes?"
@@ -378,7 +378,7 @@ def display_wordcloud(wordcloud):
 
 @app.get("/predict_satisfaction", response_class=HTMLResponse)
 def predict_satisfaction(request: Request):
-    df = pd.read_csv('Survey_Response/Student Survey Responses.csv')
+    df = pd.read_csv('Student_Response/Student Survey Responses.csv')
 
     question_cols = [
         "There is Sufficient Lab Space",
@@ -411,7 +411,7 @@ def predict_satisfaction(request: Request):
     plt.figure(figsize=(10, 6))
     sns.barplot(x=importance, y=importance.index)
     plt.xlabel('Strongly Disagree <-----------------------------> Strongly Agree')
-    plt.ylabel('Student Responses')
+    plt.ylabel('Survey Promtps')
     plt.title("Feature Importance for Satisfaction Prediction")
     plt.tight_layout()
     plt.savefig('static/graphs/satisfaction_importance.png')

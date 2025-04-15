@@ -45,12 +45,15 @@ def load_and_preprocess_data(file_path, sheet_name):
     df = pd.read_excel(xls, sheet_name=sheet_name)
 
     df = df[["No. Sat Exam", "Mean Mark", "Median Mark", "No. Pass Exam", "No. Failed Exams"]].dropna()
+    df["Total Students"] = df["No. Pass Exam"] + df["No. Failed Exams"]
+    df["Pass Rate"] = df["No. Pass Exam"] / df["Total Students"]
+    df["Fail Rate"] = df["No. Failed Exams"] / df["Total Students"]
 
     X = df[["No. Sat Exam"]].values
     y_mean = df["Mean Mark"].values
     y_median = df["Median Mark"].values
-    y_pass = df["No. Pass Exam"].values
-    y_fail = df["No. Failed Exams"].values
+    y_pass = df["Pass Rate"].values
+    y_fail = df["Fail Rate"].values
 
     return X, y_mean, y_median, y_pass, y_fail
 
@@ -133,8 +136,8 @@ def predict_marks(request: Request, class_size: int = Form(...)):
         "class_size": class_size,
         "predicted_mean": predicted_mean,
         "predicted_median": predicted_median,
-        "predicted_pass_rate": predicted_pass_rate,
-        "predicted_fail_rate": predicted_fail_rate,
+        "predicted_pass_rate": round(predicted_pass_rate * 100, 2),
+        "predicted_fail_rate": round(predicted_fail_rate * 100, 2),
         "cluster_plot": "graphs/kmean_clusters.png"
     })
 

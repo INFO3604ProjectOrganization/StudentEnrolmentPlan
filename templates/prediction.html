@@ -110,20 +110,6 @@
             <h3>Predicted Marking Cost: ${{ "%.2f"|format(estimated_cost) }}</h3>
         {% endif %}
 
-
-        <h1> Estimated Marking Cost </h3>
-        <form method="POST" action="/calculate_custom_cost">
-            <label for="cost_per_assessment">Enter Estimated Cost Per Assessment ($):</label>
-            <input type="number" name="cost_per_assessment" id="cost_per_assessment" step="0.01" required>
-            <input type="hidden" name="total_intake_sum" value="{{ total_intake_sum }}">
-            <button type="submit">Calculate Cost</button>
-        </form>
-
-        {% if custom_cost is defined %}
-            <h1>Estimated Marking Cost: ${{ custom_cost }}</h1>
-        {% endif %}
-
-
         <br><br>
         <div style="text-align: center;">
             <a href="{{ url_for('predict_marks') }}">Predict Grades</a>

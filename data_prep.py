@@ -1,8 +1,11 @@
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
+
 
 def apply_pca(df_scaled):
     pca = PCA(n_components=2) 

@@ -6,6 +6,8 @@ Quick Commands:
 
 ```bash
 pip install -r requirements.txt
+```
+```bash
 uvicorn app:app --reload
 ```
 

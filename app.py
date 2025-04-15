@@ -319,21 +319,6 @@ async def project_enrollment(request: Request):
                                         "estimated_cost": total_new_enrollment * overall_avg
                                         })
 
-@app.post("/calculate_custom_cost")
-async def calculate_custom_cost(request: Request):
-    form_data = await request.form()
-    cost_per_assessment = float(form_data.get("cost_per_assessment", 0))
-    total_intake_sum = int(form_data.get("total_intake_sum", 0))
-    
-    custom_cost = cost_per_assessment * total_intake_sum
-
-    return templates.TemplateResponse("prediction.html", {
-        "request": request,
-        "custom_cost": custom_cost,
-        "total_intake_sum": total_intake_sum
-    })
-
-
 @app.get("/wordcloud", name="wordcloud")
 def wordcloud_endpoint(request: Request):
     file_path_s = "Student_Response/Student Survey Responses.csv"

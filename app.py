@@ -309,7 +309,8 @@ async def project_enrollment(request: Request):
     plt.close()
 
     total_new_enrollment = calculate_total_new_enrollment(enrollment_data, program_avg, new_intakes)
-
+    current_enrollment = {k: int(round(v)) for k, v in current_enrollment.items()}
+    
     return templates.TemplateResponse("prediction.html", {
                                         "request": request, 
                                         "new_intakes": new_intakes,

@@ -94,17 +94,22 @@
             <th>Current Enrollment</th>
             <th>Total Enrollment</th>
         </tr>
+        
+        {% set ns = namespace(total_projected=0) %}
         {% for prog in new_intakes %}
+            {% set projected = new_intakes[prog] + current_enrollment[prog] %}
+            {% set ns.total_projected = ns.total_projected + projected %}
             <tr>
-            <td>{{ prog }}</td>
-            <td>{{ new_intakes[prog] }}</td>
-            <td>{{ current_enrollment[prog] }}</td>
-            <td>{{ new_intakes[prog] + current_enrollment[prog] }}</td>
+                <td>{{ prog }}</td>
+                <td>{{ new_intakes[prog] }}</td>
+                <td>{{ current_enrollment[prog] }}</td>
+                <td>{{ projected }}</td>
             </tr>
         {% endfor %}
         </table>
-
-        <h3>Total Year 1 Enrolment Size: {{ total_intake_sum }}</h3>
+        
+        <h3>Year 1 Enrolment Size: {{ total_intake_sum }}</h3>
+        <h3>Total Projected Enrollment: {{ ns.total_projected }}</h3>
 
         {% if estimated_cost is defined %}
             <h3>Predicted Marking Cost: ${{ "%.2f"|format(estimated_cost) }}</h3>

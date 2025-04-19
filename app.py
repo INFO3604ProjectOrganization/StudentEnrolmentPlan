@@ -16,6 +16,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from sklearn.metrics import mean_squared_error, r2_score
+
 
 from wordcloud import WordCloud
 import nltk
@@ -39,6 +41,19 @@ def load_data_kmeans(file_path, sheet_name):
     scaler = StandardScaler()
     df_scaled = scaler.fit_transform(df)
     return df, df_scaled, scaler
+
+def get_class_size_ranges(df_kmeans):
+    # Create a new column 'Class Size' as the sum of "No. Pass Exam" + "No. Failed Exams"
+    df_kmeans["Class Size"] = df_kmeans["No. Pass Exam"] + df_kmeans["No. Failed Exams"]
+    
+    class_size_ranges = {}
+    
+    for cluster_id in df_kmeans["Cluster"].unique():
+        cluster_data = df_kmeans[df_kmeans["Cluster"] == cluster_id]
+        class_size_range = (cluster_data["Class Size"].min(), cluster_data["Class Size"].max())
+        class_size_ranges[cluster_id] = class_size_range
+
+    return class_size_ranges
 
 def load_and_preprocess_data(file_path, sheet_name):
     xls = pd.ExcelFile(file_path)
@@ -80,32 +95,21 @@ def calculate_graduates_for_semester1(grades_df, courses_df):
     return graduates_by_program
 
 def calculate_total_new_enrollment(enrollment_data, program_avg, new_intakes):
-    current_enrollment = {}
-    total_new_enrollment = 0
+        latest_year = sorted(enrollment_data.keys())[-1]
+        latest_sem_data = enrollment_data[latest_year]["semester_enrollment"]
+        new_enrollment = {}
 
-    latest_year = sorted(enrollment_data.keys())[-1]
-    latest_sem_data = enrollment_data[latest_year]["semester_enrollment"]
+        for prog_num in range(1, 8):
+            prog = f"Programme {prog_num}"
+            sem1 = latest_sem_data["Semester I"].get(prog, 0)
+            sem2 = latest_sem_data["Semester II"].get(prog, 0)
+            current = (sem1 + sem2) / 2 if sem2 else sem1
 
-    for prog_num in range(1, 8):
-        prog_name = f"Programme {prog_num}"
-        sem1 = latest_sem_data["Semester I"].get(prog_name, 0)
-        sem2 = latest_sem_data["Semester II"].get(prog_name, None)
+            grads = program_avg.get(prog, 0)
+            intake = new_intakes.get(prog, 0)
+            new_enrollment[prog] = current + intake - grads
 
-        if sem2 is not None and sem2 != 0:
-            current = (sem1 + sem2) / 2
-        else:
-            current = sem1
-
-        current_enrollment[prog_name] = current
-
-    for prog_name in current_enrollment:
-        curr = current_enrollment[prog_name]
-        intake = new_intakes.get(prog_name, 0)
-        grads = program_avg.get(prog_name, 0)
-        new_enrol = curr + intake - grads
-        total_new_enrollment += new_enrol
-
-    return total_new_enrollment
+        return new_enrollment
 
 @app.get("/predict_marks", response_class=HTMLResponse)
 def get_prediction_form(request: Request):
@@ -117,7 +121,7 @@ def predict_marks(request: Request, class_size: int = Form(...)):
     sheet_name = "Grades Anonymized"
     X, y_mean, y_median, y_pass, y_fail = load_and_preprocess_data(file_path, sheet_name)
     
-    model_mean, model_median, model_pass, model_fail = train_models(X, y_mean, y_median, y_pass, y_fail)
+    model_mean, model_median, model_pass, model_fail, rmse_mean = train_models(X, y_mean, y_median, y_pass, y_fail)
 
     predicted_mean, predicted_median, predicted_pass_rate, predicted_fail_rate = predict_marks_logic(
         class_size, model_mean, model_median, model_pass, model_fail
@@ -130,6 +134,7 @@ def predict_marks(request: Request, class_size: int = Form(...)):
     kmeans = KMeans(n_clusters=best_k, random_state=42)
     df_kmeans["Cluster"] = kmeans.fit_predict(pca_result)
     visualize_clusters(pca_result, df_kmeans["Cluster"].values, kmeans.cluster_centers_, best_k)
+    cluster_ranges = get_class_size_ranges(df_kmeans)
 
     return templates.TemplateResponse("predict_grades.html", {
         "request": request,
@@ -138,15 +143,26 @@ def predict_marks(request: Request, class_size: int = Form(...)):
         "predicted_median": predicted_median,
         "predicted_pass_rate": round(predicted_pass_rate * 100, 2),
         "predicted_fail_rate": round(predicted_fail_rate * 100, 2),
-        "cluster_plot": "graphs/kmean_clusters.png"
+        "cluster_plot": "graphs/kmean_clusters.png",
+        "rmse": round(rmse_mean, 2),
+        "cluster_ranges": cluster_ranges 
     })
 
 def train_models(X, y_mean, y_median, y_pass, y_fail):
+
     model_mean = LinearRegression().fit(X, y_mean)
     model_median = LinearRegression().fit(X, y_median)
     model_pass = LinearRegression().fit(X, y_pass)
     model_fail = LinearRegression().fit(X, y_fail)
-    return model_mean, model_median, model_pass, model_fail
+
+    mse_mean = mean_squared_error(y_mean, model_mean.predict(X))
+    #mse_median = mean_squared_error(y_median, model_median.predict(X))
+    #mse_pass = mean_squared_error(y_pass, model_pass.predict(X))
+    #mse_fail = mean_squared_error(y_fail, model_fail.predict(X))
+
+    rmse_mean = np.sqrt(mse_mean)
+
+    return model_mean, model_median, model_pass, model_fail, rmse_mean
 
 def predict_marks_logic(class_size, model_mean, model_median, model_pass, model_fail):
     class_size_array = np.array([[class_size]])
@@ -165,7 +181,6 @@ async def project_enrollment(request: Request):
 
     grades_df = grades_df.drop_duplicates()
     enrollment_data = {}
-
     years = grades_df['YEAR'].unique()
 
     for year in years:
@@ -173,11 +188,9 @@ async def project_enrollment(request: Request):
             year = year.split()[0]
         
         year_data = grades_df[grades_df['YEAR'] == year]
-        
-        program_enrollment = {}
-        program_courses = {}
         semester_enrollment = {'Semester I': {}, 'Semester II': {}}
         semester_i_level_1_enrollment = {'Semester I': {}}
+        program_courses = {}
 
         for program_num in range(1, 8):
             program_col = f"Programme {program_num}"
@@ -190,26 +203,26 @@ async def project_enrollment(request: Request):
             course_ids_semester_i = semester_i_courses["CourseID"].tolist()
             course_ids_semester_ii = semester_ii_courses["CourseID"].tolist()
 
-            filtered_grades_semester_i = year_data[year_data["CourseID"].isin(course_ids_semester_i)]
-            filtered_grades_semester_ii = year_data[year_data["CourseID"].isin(course_ids_semester_ii)]
+            filtered_i = year_data[year_data["CourseID"].isin(course_ids_semester_i)]
+            filtered_ii = year_data[year_data["CourseID"].isin(course_ids_semester_ii)]
 
-            total_enrollment_semester_i = filtered_grades_semester_i["No. Pass Exam"].sum() + filtered_grades_semester_i["No. Failed Exams"].sum()
-            total_enrollment_semester_ii = filtered_grades_semester_ii["No. Pass Exam"].sum() + filtered_grades_semester_ii["No. Failed Exams"].sum()
+            total_i = filtered_i["No. Pass Exam"].sum() + filtered_i["No. Failed Exams"].sum()
+            total_ii = filtered_ii["No. Pass Exam"].sum() + filtered_ii["No. Failed Exams"].sum()
 
-            semester_enrollment['Semester I'][f"Programme {program_num}"] = total_enrollment_semester_i
-            semester_enrollment['Semester II'][f"Programme {program_num}"] = total_enrollment_semester_ii
+            semester_enrollment['Semester I'][program_col] = total_i
+            semester_enrollment['Semester II'][program_col] = total_ii
 
-            program_courses[f"Programme {program_num}"] = {
+            program_courses[program_col] = {
                 'Semester I': ", ".join(course_ids_semester_i),
                 'Semester II': ", ".join(course_ids_semester_ii)
             }
 
-            level_1_courses_semester_i = semester_i_courses[semester_i_courses['Level'] == 1]
-            level_1_course_ids = level_1_courses_semester_i["CourseID"].tolist()
-            filtered_grades_level_1_semester_i = year_data[year_data["CourseID"].isin(level_1_course_ids)]
-            total_level_1_enrollment_semester_i = filtered_grades_level_1_semester_i["No. Pass Exam"].sum() + filtered_grades_level_1_semester_i["No. Failed Exams"].sum()
+            level_1_courses = semester_i_courses[semester_i_courses['Level'] == 1]
+            level_1_ids = level_1_courses["CourseID"].tolist()
+            level_1_filtered = year_data[year_data["CourseID"].isin(level_1_ids)]
+            level_1_total = level_1_filtered["No. Pass Exam"].sum() + level_1_filtered["No. Failed Exams"].sum()
 
-            semester_i_level_1_enrollment['Semester I'][f"Programme {program_num}"] = total_level_1_enrollment_semester_i
+            semester_i_level_1_enrollment['Semester I'][program_col] = level_1_total
 
         enrollment_data[year] = {
             "semester_enrollment": semester_enrollment,
@@ -221,46 +234,35 @@ async def project_enrollment(request: Request):
     years_counted = 0
 
     for year in enrollment_data:
-        grads = calculate_graduates_for_semester1(
-            grades_df[grades_df['YEAR'] == year],
-            courses_df
-        )
+        grads = calculate_graduates_for_semester1(grades_df[grades_df['YEAR'] == year], courses_df)
         for prog in grads:
             program_totals[prog].append(grads[prog])
         years_counted += 1
 
-    program_avg = {}
-    for prog, yearly_counts in program_totals.items():
-        avg = sum(yearly_counts) / len(yearly_counts) if yearly_counts else 0
-        program_avg[prog] = avg
-
-    final_overall_avg = sum(program_avg.values()) / years_counted if years_counted else 0
+    program_avg = {
+        prog: sum(vals) / len(vals) if vals else 0
+        for prog, vals in program_totals.items()
+    }
 
     latest_year = sorted(enrollment_data.keys())[-1]
     latest_sem_data = enrollment_data[latest_year]["semester_enrollment"]
 
     current_enrollment = {}
     for prog_num in range(1, 8):
-        prog_name = f"Programme {prog_num}"
-        sem1 = latest_sem_data["Semester I"].get(prog_name, 0)
-        sem2 = latest_sem_data["Semester II"].get(prog_name, None)
+        prog = f"Programme {prog_num}"
+        sem1 = latest_sem_data["Semester I"].get(prog, 0)
+        sem2 = latest_sem_data["Semester II"].get(prog, 0)
 
-        if sem2 is not None and sem2 != 0:
-            current = (sem1 + sem2) / 2
-        else:
-            current = sem1
-
-        current_enrollment[prog_name] = current
+        current = (sem1 + sem2) / 2 if sem2 else sem1
+        current_enrollment[prog] = int(round(current))
 
     form_data = await request.form()
     new_intakes = {}
     total_intake_sum = 0
-
     for prog_num in range(1, 8):
-        prog_name = f"Programme {prog_num}"
-        intake_str = form_data.get(f"program{prog_num}", 0)
-        intake = int(intake_str)
-        new_intakes[prog_name] = intake
+        prog = f"Programme {prog_num}"
+        intake = int(form_data.get(f"program{prog_num}", 0))
+        new_intakes[prog] = intake
         total_intake_sum += intake
 
     total_new_enrollment = calculate_total_new_enrollment(enrollment_data, program_avg, new_intakes)
@@ -276,16 +278,11 @@ async def project_enrollment(request: Request):
     )
 
     merged_df["Cost Per Student"] = merged_df["Total Marking Cost"] / merged_df["Total Enrolled"]
-
     avg_cost_per_semester = merged_df.groupby("Semester")["Cost Per Student"].mean()
+    semester_costs = list(avg_cost_per_semester.values)
+    overall_avg = sum(semester_costs) / len(semester_costs) if semester_costs else 0
 
-    semester_costs = []
-    for semester, avg_cost in avg_cost_per_semester.items():
-        print(f"Semester {semester}: {avg_cost:.2f}")
-        semester_costs.append(avg_cost)
-
-    if semester_costs:
-        overall_avg = sum(semester_costs) / len(semester_costs)
+    total_estimated_cost = sum(total_new_enrollment.values()) * overall_avg
 
     X_cost = merged_df["Total Enrolled"].values.reshape(-1, 1)
     y_cost = merged_df["Total Marking Cost"].values 
@@ -308,16 +305,15 @@ async def project_enrollment(request: Request):
     plt.legend()
     plt.close()
 
-    total_new_enrollment = calculate_total_new_enrollment(enrollment_data, program_avg, new_intakes)
     current_enrollment = {k: int(round(v)) for k, v in current_enrollment.items()}
     
     return templates.TemplateResponse("prediction.html", {
-                                        "request": request, 
+                                        "request": request,
                                         "new_intakes": new_intakes,
                                         "total_intake_sum": total_intake_sum,
                                         "current_enrollment": current_enrollment,
                                         "total_new_enrollment": total_new_enrollment,
-                                        "estimated_cost": total_new_enrollment * overall_avg
+                                        "estimated_cost": total_estimated_cost
                                         })
 
 @app.get("/wordcloud", name="wordcloud")

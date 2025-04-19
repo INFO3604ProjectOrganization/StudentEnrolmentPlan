@@ -64,6 +64,25 @@
             margin-top: 20px;
             text-align: center;
         }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+
+        th, td {
+            padding: 10px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
     </style>
     <title>Predict Grades</title>
 </head>
@@ -79,22 +98,38 @@
 
         {% if class_size %}
         <div class="card">
+            <h3>Model Prediction Error (RMSE): {{ rmse }}</h3>
             <h3> Prediction Results for Class Size: {{ class_size }}</h3>
 
-            <h4>Predicted Mean: {{ "%.2f"|format(predicted_mean) }}</li>
-            <h4>Predicted Median: {{ "%.2f"|format(predicted_median) }}</li>
-            <h4>Predicted Pass Rate: {{ "%.2f"|format(predicted_pass_rate) }}%</li>
-            <h4>Predicted Fail Rate: {{ "%.2f"|format(predicted_fail_rate) }}%</li>
+            <h4>Predicted Mean: {{ "%.2f"|format(predicted_mean) }}</h4>
+            <h4>Predicted Median: {{ "%.2f"|format(predicted_median) }}</h4>
+            <h4>Predicted Pass Rate: {{ "%.2f"|format(predicted_pass_rate) }}%</h4>
+            <h4>Predicted Fail Rate: {{ "%.2f"|format(predicted_fail_rate) }}%</h4>
         </div>
-    {% endif %}
+
+        <h3>Cluster Class Size Ranges:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Cluster</th>
+                    <th>Class Size Min</th>
+                    <th>Class Size Max</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cluster in cluster_ranges.keys()|sort %}
+                    <tr>
+                        <td>Cluster {{ cluster }}</td>
+                        <td>{{ cluster_ranges[cluster][0] }}</td>
+                        <td>{{ cluster_ranges[cluster][1] }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
 
         <h3> K-Means Clustering Visualization</h3>
         <img src="static/graphs/kmeans_clusters.png" alt="KMeans Clusters" style="max-width: 100%; border: 1px solid #ccc; padding: 10px;">
-
-
-        <form action="/predict_satisfaction">
-            <button type="submit">Predict Student Satisfaction</button>
-        </form>
     </div>
 </body>
 </html>
